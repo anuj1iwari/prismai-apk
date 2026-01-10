@@ -663,6 +663,34 @@ export default function App() {
   const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'account' | 'data' | 'subscription'>('general');
   const [activeLegalDoc, setActiveLegalDoc] = useState<'privacy' | 'terms' | null>(null);
 
+  // Load API Key from Environment Variable OR localStorage
+  const [userApiKey, setUserApiKey] = useState('');
+
+  // ----------------------------------------------------------------------------------
+  // IMPORTANT FOR LOCAL USE:
+  // To enable .env support in your local VS Code environment, please:
+  // 1. Uncomment the line starting with "const VITE_API_KEY = import.meta..." below.
+  // 2. Comment out or remove the line "const VITE_API_KEY = "";".
+  // ----------------------------------------------------------------------------------
+  
+  // UNCOMMENT THIS LINE FOR LOCAL USE:
+  // const VITE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  // COMMENT THIS LINE FOR LOCAL USE:
+  const VITE_API_KEY = ""; 
+
+  useEffect(() => {
+    // Fallback: Read from localStorage if user entered it in Settings manually
+    const storedKey = localStorage.getItem('prism_api_key');
+
+    // Use the variable defined above
+    if (VITE_API_KEY) {
+        setUserApiKey(VITE_API_KEY);
+    } else if (storedKey) {
+        setUserApiKey(storedKey);
+    }
+  }, []);
+
   const [activeModels, setActiveModels] = useState<string[]>(MODELS.map((m) => m.id));
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -750,9 +778,9 @@ export default function App() {
 
     // ---------------------------------------------------------
     // API Key Configuration
-    // NOTE: Real AI responses ke liye yahan key hona zaroori hai.
+    // Fixed: Uses User API Key (From Settings/LocalStorage)
     // ---------------------------------------------------------
-    const apiKey = "AIzaSyD42c3cI7SZbyCCINsuwpVRgkIkt2ixe9k"; 
+    const apiKey = userApiKey; 
 
     try {
       const modelsToProcess = isMultiChat ? activeModels : [activeModels[0]];
@@ -761,14 +789,14 @@ export default function App() {
       const fetchResponse = async (modelId: string) => {
         const modelInfo = MODELS.find((m) => m.id === modelId);
 
-        // CHECK: Agar API Key nahi hai, toh Simulation/Demo responses bhejo
+        // CHECK: Agar API Key nahi hai, toh User ko Settings check karne ko bolo
         if (!apiKey || apiKey.trim() === "") {
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           return {
             role: 'assistant' as const,
             modelId,
             modelName: modelInfo?.name,
-            content: `[Demo Mode] I am ${modelInfo?.name}. Since no API key was provided, this is a simulated response. Please add a valid Google Gemini API key in the code to get real intelligence.`,
+            content: `⚠️ **API Key Missing**: Please go to **Settings > General** and check if your API Key is loaded correctly. \n\nIf using .env locally, make sure you uncommented the line in App.tsx.`,
             timestamp: new Date(),
           };
         }
@@ -786,7 +814,7 @@ export default function App() {
         }
 
         const callGemini = async (modelName: string) => {
-           const response = await fetch(
+            const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
             {
               method: 'POST',
@@ -1060,6 +1088,44 @@ export default function App() {
 
             {activeSettingsTab === 'general' && (
               <div className="space-y-6">
+                {/* API Key Input Section - UPDATED */}
+                <div className={`p-5 rounded-xl border ${isDark ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-yellow-600/20 bg-yellow-50'} mb-6`}>
+                   <div className="flex items-start gap-3">
+                      <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500 mt-1">
+                         <Lock className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-lg mb-1">API Configuration</h4>
+                        {VITE_API_KEY ? (
+                            <div className="mb-3 text-sm text-green-500 flex items-center gap-2 font-medium">
+                                <CheckCircle2 className="w-4 h-4" />
+                                API Key Loaded from .env file (Secure)
+                            </div>
+                        ) : (
+                            <p className={`text-sm ${theme.textMuted} mb-3`}>
+                                For better security, add <code>VITE_GEMINI_API_KEY</code> to your <code>.env</code> file. 
+                                Or paste it here temporarily (stored in browser only).
+                            </p>
+                        )}
+                        
+                        <input 
+                          type="password" 
+                          placeholder={VITE_API_KEY ? "Hidden from .env" : "Paste API Key here (starts with AIza...)"}
+                          value={userApiKey}
+                          disabled={!!VITE_API_KEY}
+                          onChange={(e) => {
+                             setUserApiKey(e.target.value);
+                             localStorage.setItem('prism_api_key', e.target.value);
+                          }}
+                          className={`w-full p-3 rounded-lg border ${theme.border} bg-transparent outline-none focus:border-emerald-500 transition-colors ${VITE_API_KEY ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        />
+                         <div className="mt-2 text-xs text-emerald-500 font-medium flex items-center gap-1">
+                           {!VITE_API_KEY && userApiKey ? <><CheckCircle2 className="w-3 h-3" /> API Key saved locally</> : null}
+                        </div>
+                      </div>
+                   </div>
+                </div>
+
                 <div className="flex items-center justify-between p-4 border rounded-xl border-gray-700/20 bg-gray-500/5">
                   <div className="flex items-center gap-4">
                     <div
