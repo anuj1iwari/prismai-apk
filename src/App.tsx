@@ -678,7 +678,7 @@ export default function App() {
   const VITE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY; 
   
   // COMMENT THIS LINE OUT WHEN USING .ENV:
-  const VITE_API_KEY = ""; 
+  //const VITE_API_KEY = ""; 
 
   useEffect(() => {
     // Fallback: Read from localStorage if user previously entered it
