@@ -667,20 +667,21 @@ export default function App() {
   const [userApiKey, setUserApiKey] = useState('');
 
   // ----------------------------------------------------------------------------------
-  // IMPORTANT FOR LOCAL USE:
-  // To enable .env support in your local VS Code environment, please:
-  // 1. Uncomment the line starting with "const VITE_API_KEY = import.meta..." below.
-  // 2. Comment out or remove the line "const VITE_API_KEY = "";".
+  // IMPORTANT FOR STACKBLITZ / LOCAL VITE:
+  // To enable .env support in StackBlitz or VS Code:
+  // 1. Create a .env file with VITE_GEMINI_API_KEY=your_key
+  // 2. UNCOMMENT the line below starting with 'const VITE_API_KEY = ...'
+  // 3. COMMENT OUT the line 'const VITE_API_KEY = "";'
   // ----------------------------------------------------------------------------------
   
-  // UNCOMMENT THIS LINE FOR LOCAL USE:
-  // const VITE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  // UNCOMMENT THIS LINE FOR STACKBLITZ/VITE:
+  const VITE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY; 
   
-  // COMMENT THIS LINE FOR LOCAL USE:
+  // COMMENT THIS LINE OUT WHEN USING .ENV:
   const VITE_API_KEY = ""; 
 
   useEffect(() => {
-    // Fallback: Read from localStorage if user entered it in Settings manually
+    // Fallback: Read from localStorage if user previously entered it
     const storedKey = localStorage.getItem('prism_api_key');
 
     // Use the variable defined above
@@ -778,7 +779,7 @@ export default function App() {
 
     // ---------------------------------------------------------
     // API Key Configuration
-    // Fixed: Uses User API Key (From Settings/LocalStorage)
+    // Fixed: Uses User API Key (From .env or localStorage)
     // ---------------------------------------------------------
     const apiKey = userApiKey; 
 
@@ -796,7 +797,7 @@ export default function App() {
             role: 'assistant' as const,
             modelId,
             modelName: modelInfo?.name,
-            content: `⚠️ **API Key Missing**: Please go to **Settings > General** and check if your API Key is loaded correctly. \n\nIf using .env locally, make sure you uncommented the line in App.tsx.`,
+            content: `⚠️ **API Key Missing**: Please check if your \`.env\` file is set correctly with \`VITE_GEMINI_API_KEY\` and that you have uncommented the line in \`App.tsx\`.`,
             timestamp: new Date(),
           };
         }
@@ -1088,43 +1089,8 @@ export default function App() {
 
             {activeSettingsTab === 'general' && (
               <div className="space-y-6">
-                {/* API Key Input Section - UPDATED */}
-                <div className={`p-5 rounded-xl border ${isDark ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-yellow-600/20 bg-yellow-50'} mb-6`}>
-                   <div className="flex items-start gap-3">
-                      <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500 mt-1">
-                         <Lock className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-lg mb-1">API Configuration</h4>
-                        {VITE_API_KEY ? (
-                            <div className="mb-3 text-sm text-green-500 flex items-center gap-2 font-medium">
-                                <CheckCircle2 className="w-4 h-4" />
-                                API Key Loaded from .env file (Secure)
-                            </div>
-                        ) : (
-                            <p className={`text-sm ${theme.textMuted} mb-3`}>
-                                For better security, add <code>VITE_GEMINI_API_KEY</code> to your <code>.env</code> file. 
-                                Or paste it here temporarily (stored in browser only).
-                            </p>
-                        )}
-                        
-                        <input 
-                          type="password" 
-                          placeholder={VITE_API_KEY ? "Hidden from .env" : "Paste API Key here (starts with AIza...)"}
-                          value={userApiKey}
-                          disabled={!!VITE_API_KEY}
-                          onChange={(e) => {
-                             setUserApiKey(e.target.value);
-                             localStorage.setItem('prism_api_key', e.target.value);
-                          }}
-                          className={`w-full p-3 rounded-lg border ${theme.border} bg-transparent outline-none focus:border-emerald-500 transition-colors ${VITE_API_KEY ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        />
-                         <div className="mt-2 text-xs text-emerald-500 font-medium flex items-center gap-1">
-                           {!VITE_API_KEY && userApiKey ? <><CheckCircle2 className="w-3 h-3" /> API Key saved locally</> : null}
-                        </div>
-                      </div>
-                   </div>
-                </div>
+                
+                {/* API Key Input Removed as per user request */}
 
                 <div className="flex items-center justify-between p-4 border rounded-xl border-gray-700/20 bg-gray-500/5">
                   <div className="flex items-center gap-4">
