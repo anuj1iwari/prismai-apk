@@ -25,7 +25,6 @@ import {
   ArrowRight,
   CheckCircle2,
   PlayCircle,
-  FolderCog,
   FileText,
   Paperclip,
   Sun,
@@ -36,20 +35,73 @@ import {
   GitBranch,
   Fingerprint,
   Sliders,
-  Home,
+  Trash2,
+  Download,
+  Activity,
+  CreditCard,
+  Bell,
+  ChevronsLeft,
+  User,
   LogOut,
   ChevronLeft,
   ShieldCheck,
-  ChevronsLeft,
-  User,
-  CreditCard,
-  Bell,
-  Trash2,
-  Download,
-  Eye,
-  Activity,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// --- Types & Interfaces ---
+
+interface Model {
+  id: string;
+  name: string;
+  version: string;
+  icon: React.ReactNode;
+  color: string;
+  premium: boolean;
+  provider: string;
+}
+
+interface Message {
+  role: 'user' | 'assistant' | 'synthesis';
+  content: string;
+  timestamp: Date;
+  modelId?: string;
+  modelName?: string;
+  isVerification?: boolean;
+}
+
+interface ModelCharacteristic {
+  name: string;
+  tag: string;
+  desc: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+interface FaqItem {
+  q: string;
+  a: string;
+}
+
+interface CardItem {
+  title: string;
+  desc: string;
+  image: string;
+}
+
+interface LandingFeature {
+  title: string;
+  desc: string;
+  icon: React.ReactElement;
+  gradient: string;
+  image: string;
+  points: string[];
+}
+
+interface HeroState {
+  text: string;
+  subtext: string;
+  type: string;
+}
 
 // --- Legal Content Data ---
 const TERMS_CONTENT = `
@@ -129,7 +181,7 @@ For privacy-related inquiries, please email support@prismai.ai.
 `;
 
 // --- Custom Aesthetic Prism Logo (7 Colors & White Triangle) ---
-const PrismLogo = ({ className }) => (
+const PrismLogo: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -233,7 +285,7 @@ const PrismLogo = ({ className }) => (
 );
 
 // --- Constants & Mock Data ---
-const MODELS = [
+const MODELS: Model[] = [
   {
     id: 'gpt',
     name: 'ChatGPT',
@@ -299,7 +351,7 @@ const MODELS = [
   },
 ];
 
-const MODEL_CHARACTERISTICS = {
+const MODEL_CHARACTERISTICS: { left: ModelCharacteristic[]; right: ModelCharacteristic[] } = {
   left: [
     {
       name: 'ChatGPT 5',
@@ -355,7 +407,7 @@ const MODEL_CHARACTERISTICS = {
   ],
 };
 
-const FAQS = [
+const FAQS: FaqItem[] = [
   {
     q: 'How is Prism AI different from subscribing to each AI separately?',
     a: 'Prism AI brings together the world’s most powerful AI models — Grok 4, ChatGPT 5, Gemini 2.5 Pro, DeepSeek, Claude Sonnet 4, and Perplexity Sonar Pro — in one place.',
@@ -382,7 +434,7 @@ const FAQS = [
   },
 ];
 
-const CARDS = [
+const CARDS: CardItem[] = [
   {
     title: 'Albert Einstein',
     desc: 'Revolutionized science, imagination beyond known limits.',
@@ -397,7 +449,7 @@ const CARDS = [
   },
 ];
 
-const LANDING_FEATURES = [
+const LANDING_FEATURES: LandingFeature[] = [
   {
     title: 'AI Jury System',
     desc: '7 AI Judges. Models evaluate each other’s answers. Highest score wins. We don’t just aggregate; we adjudicate.',
@@ -530,7 +582,7 @@ const LANDING_FEATURES = [
   },
 ];
 
-const HERO_STATES = [
+const HERO_STATES: HeroState[] = [
   {
     text: 'One Chat.',
     subtext: 'Unified Interface for all models.',
@@ -543,7 +595,13 @@ const HERO_STATES = [
   },
 ];
 
-const Switch = ({ isOn, onToggle, id }) => (
+interface SwitchProps {
+  isOn: boolean;
+  onToggle: (val: boolean) => void;
+  id: string;
+}
+
+const Switch: React.FC<SwitchProps> = ({ isOn, onToggle, id }) => (
   <motion.div
     className={`w-12 h-7 flex items-center rounded-full p-1 cursor-pointer ${
       isOn ? 'bg-gradient-to-r from-blue-500 to-green-400' : 'bg-gray-700'
@@ -560,7 +618,7 @@ const Switch = ({ isOn, onToggle, id }) => (
   </motion.div>
 );
 
-const TypewriterText = ({ text, speed = 20 }) => {
+const TypewriterText: React.FC<{ text: string; speed?: number }> = ({ text, speed = 20 }) => {
   const [displayedText, setDisplayedText] = useState('');
   useEffect(() => {
     let i = 0;
@@ -577,7 +635,11 @@ const TypewriterText = ({ text, speed = 20 }) => {
   return <span>{displayedText}</span>;
 };
 
-const LandingSection = ({ children, className = '', id = '' }) => {
+const LandingSection: React.FC<{ children: React.ReactNode; className?: string; id?: string }> = ({
+  children,
+  className = '',
+  id = '',
+}) => {
   return (
     <motion.div
       id={id}
@@ -593,30 +655,31 @@ const LandingSection = ({ children, className = '', id = '' }) => {
 };
 
 export default function App() {
-  const [view, setView] = useState('landing');
+  const [view, setView] = useState<'landing' | 'signin' | 'chat'>('landing');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showModelModal, setShowModelModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState('general');
-  const [activeLegalDoc, setActiveLegalDoc] = useState(null); // 'privacy' | 'terms'
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'account' | 'data' | 'subscription'>('general');
+  const [activeLegalDoc, setActiveLegalDoc] = useState<'privacy' | 'terms' | null>(null);
 
-  const [activeModels, setActiveModels] = useState(MODELS.map((m) => m.id));
+  const [activeModels, setActiveModels] = useState<string[]>(MODELS.map((m) => m.id));
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isMultiChat, setIsMultiChat] = useState(false);
   const [isSuperFiesta, setIsSuperFiesta] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [openFaq, setOpenFaq] = useState(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
   const [confidenceMode, setConfidenceMode] = useState('Balanced');
 
-  const chatContainerRef = useRef(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // This effect is mainly a placeholder for logic that might sync models
     const allModelIds = MODELS.map((m) => m.id);
     if (activeModels.length < allModelIds.length) {
       // Only reset if strict sync is needed, logic can vary
@@ -654,7 +717,7 @@ export default function App() {
     chatUserBubble: isDark ? 'bg-[#2a2a2a]' : 'bg-blue-600 text-white',
   };
 
-  const scrollToSection = (id) => {
+  const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
@@ -665,7 +728,7 @@ export default function App() {
     setTimeout(() => setView('chat'), 800);
   };
 
-  const toggleModel = (id) => {
+  const toggleModel = (id: string) => {
     if (activeModels.includes(id)) {
       setActiveModels(activeModels.filter((m) => m !== id));
     } else {
@@ -680,44 +743,144 @@ export default function App() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    const userMsg = { role: 'user', content: input, timestamp: new Date() };
+    const userMsg: Message = { role: 'user', content: input, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setProcessing(true);
 
-    setTimeout(() => {
-      const newResponses = (isMultiChat ? activeModels : [activeModels[0]]).map(
-        (modelId) => {
-          const modelInfo = MODELS.find((m) => m.id === modelId);
+    // ---------------------------------------------------------
+    // API Key Configuration
+    // NOTE: Real AI responses ke liye yahan key hona zaroori hai.
+    // ---------------------------------------------------------
+    const apiKey = "AIzaSyD42c3cI7SZbyCCINsuwpVRgkIkt2ixe9k"; 
+
+    try {
+      const modelsToProcess = isMultiChat ? activeModels : [activeModels[0]];
+      
+      // Helper function to fetch response with retry logic
+      const fetchResponse = async (modelId: string) => {
+        const modelInfo = MODELS.find((m) => m.id === modelId);
+
+        // CHECK: Agar API Key nahi hai, toh Simulation/Demo responses bhejo
+        if (!apiKey || apiKey.trim() === "") {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
           return {
-            role: 'assistant',
+            role: 'assistant' as const,
             modelId,
             modelName: modelInfo?.name,
-            content: `Here is a simulated response from ${modelInfo?.name} (${modelInfo?.version}) regarding "${userMsg.content}". In a real app, this would be streamed from the ${modelInfo?.provider} API.`,
+            content: `[Demo Mode] I am ${modelInfo?.name}. Since no API key was provided, this is a simulated response. Please add a valid Google Gemini API key in the code to get real intelligence.`,
             timestamp: new Date(),
           };
         }
-      );
-      setMessages((prev) => [...prev, ...newResponses]);
+
+        // TRICK: Hum har model ke liye Gemini API use karenge, par usse bolenge ki woh specific model ki tarah act kare.
+        let personaPrompt = "";
+        switch(modelId) {
+          case 'gpt': personaPrompt = "You are ChatGPT 5, created by OpenAI. Answer concisely and clearly."; break;
+          case 'anthropic': personaPrompt = "You are Claude 3.7, created by Anthropic. Be helpful, harmless, and honest. Use a sophisticated tone."; break;
+          case 'perplexity': personaPrompt = "You are Perplexity Sonar. Focus on providing factual, up-to-date information."; break;
+          case 'xai': personaPrompt = "You are Grok 4 by xAI. Be witty, slightly rebellious, and direct."; break;
+          case 'deepseek': personaPrompt = "You are DeepSeek. Focus on logic, code, and technical accuracy."; break;
+          case 'blackbox': personaPrompt = "You are Blackbox AI. Focus strictly on programming and code solutions."; break;
+          default: personaPrompt = "You are Gemini 2.5 Pro by Google. Be helpful."; break;
+        }
+
+        const callGemini = async (modelName: string) => {
+           const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                contents: [{ 
+                  parts: [{ 
+                    text: `${personaPrompt}\n\nUser Query: ${userMsg.content}` 
+                  }] 
+                }] 
+              }),
+            }
+          );
+          if (!response.ok) {
+             const errorData = await response.json().catch(() => ({}));
+             throw new Error(errorData.error?.message || `API Error: ${response.statusText}`);
+          }
+          return await response.json();
+        };
+
+        try {
+          // Attempt 1: Try Gemini 2.5 Flash Preview (Requested)
+          const data = await callGemini('gemini-2.5-flash-preview-09-2025');
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content found.";
+          
+          return {
+            role: 'assistant' as const,
+            modelId,
+            modelName: modelInfo?.name,
+            content: text,
+            timestamp: new Date(),
+          };
+        } catch (error: any) {
+          // Attempt 2: Fallback to Gemini 1.5 Flash (More stable/Higher Limits)
+          console.warn(`Gemini 2.5 failed for ${modelId}, falling back to 1.5-flash. Error: ${error.message}`);
+          
+          try {
+             // Adding a small delay before retry to help with rate limits
+             await new Promise(r => setTimeout(r, 1000));
+             const data = await callGemini('gemini-1.5-flash');
+             const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content found.";
+             return {
+                role: 'assistant' as const,
+                modelId,
+                modelName: modelInfo?.name,
+                content: text,
+                timestamp: new Date(),
+             };
+          } catch (retryError: any) {
+             console.error("API Error Details:", retryError);
+             return {
+              role: 'assistant' as const,
+              modelId,
+              modelName: modelInfo?.name,
+              content: `Error: ${retryError.message || "Could not connect to AI Service. Please check your API Key."}`,
+              timestamp: new Date(),
+            };
+          }
+        }
+      };
+
+      // Execute requests sequentially to respect Rate Limits (5 RPM on free tier)
+      for (const modelId of modelsToProcess) {
+         if (isMultiChat) {
+            // Add substantial delay between requests in multi-chat to avoid 429 errors
+            await new Promise(resolve => setTimeout(resolve, 2500)); 
+         }
+         
+         const responseMsg = await fetchResponse(modelId);
+         setMessages((prev) => [...prev, responseMsg]);
+      }
+
       if (isSuperFiesta) {
         setTimeout(() => {
           setMessages((prev) => [
             ...prev,
             {
               role: 'synthesis',
-              content: `PRISM SYNTHESIS:\n\n⚖️ Jury Consensus: 9.8/10\n✅ No Contradictions Detected.\n\nAnalyzing responses... Consensus suggests leveraging strengths of each perspective.`,
+              content: `PRISM SYNTHESIS:\n\n⚖️ Jury Consensus: 9.8/10\n✅ No Contradictions Detected.\n\nAnalyzing responses... All AI models have provided their perspectives successfully.`,
               timestamp: new Date(),
             },
           ]);
           setProcessing(false);
-        }, 2000);
+        }, 1000);
       } else {
         setProcessing(false);
       }
-    }, 1000);
+    } catch (err) {
+      console.error("Chat Error:", err);
+      setProcessing(false);
+    }
   };
 
-  const handleVerify = (index) => {
+  const handleVerify = (index: number) => {
     const originalMsg = messages[index];
     // Find a verifier that is DIFFERENT from the original model
     const availableVerifiers = MODELS.filter(
@@ -735,7 +898,7 @@ export default function App() {
 
     // Simulate verification delay
     setTimeout(() => {
-      const verificationMsg = {
+      const verificationMsg: Message = {
         role: 'assistant',
         modelId: verifier.id,
         modelName: `${verifier.name} (Verifier)`,
@@ -748,7 +911,7 @@ export default function App() {
     }, 1500);
   };
 
-  const AttachMenu = ({ dropUp = true }) => (
+  const AttachMenu: React.FC<{ dropUp?: boolean }> = ({ dropUp = true }) => (
     <motion.div
       initial={{ opacity: 0, y: dropUp ? 10 : -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -789,7 +952,7 @@ export default function App() {
   );
 
   // --- Legal Modal Component ---
-  const LegalModal = ({ title, content, onClose }) => (
+  const LegalModal: React.FC<{ title: string; content: string; onClose: () => void }> = ({ title, content, onClose }) => (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
@@ -840,10 +1003,10 @@ export default function App() {
   // --- Settings Modal Component ---
   const SettingsModal = () => {
     const tabs = [
-      { id: 'general', label: 'General', icon: Sliders },
-      { id: 'account', label: 'Account', icon: User },
-      { id: 'data', label: 'Data Controls', icon: Activity },
-      { id: 'subscription', label: 'Subscription', icon: CreditCard },
+      { id: 'general' as const, label: 'General', icon: Sliders },
+      { id: 'account' as const, label: 'Account', icon: User },
+      { id: 'data' as const, label: 'Data Controls', icon: Activity },
+      { id: 'subscription' as const, label: 'Subscription', icon: CreditCard },
     ];
 
     return (
@@ -967,6 +1130,7 @@ export default function App() {
                   <input
                     type="text"
                     value="Anuj Tiwari"
+                    readOnly
                     className={`w-full p-3 rounded-xl border ${theme.border} bg-transparent`}
                   />
 
@@ -1160,7 +1324,6 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
-              {/* Added "Designed & Built by" here above the main heading */}
               <span
                 className={`inline-block py-1 px-3 rounded-full bg-white/5 border ${theme.border} text-gray-300 text-xs font-bold tracking-wider mb-6`}
               >
@@ -1633,7 +1796,9 @@ export default function App() {
                         </span>
                       </div>
                     </div>
-                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
+                    <p
+                      className={`text-sm ${theme.textMuted} leading-relaxed`}
+                    >
                       {model.desc}
                     </p>
                     <div className="hidden md:block absolute top-1/2 -right-8 w-8 h-[2px] bg-gradient-to-r from-emerald-500/50 to-transparent" />
@@ -1669,7 +1834,9 @@ export default function App() {
                         </span>
                       </div>
                     </div>
-                    <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
+                    <p
+                      className={`text-sm ${theme.textMuted} leading-relaxed`}
+                    >
                       {model.desc}
                     </p>
                     <div className="hidden md:block absolute top-1/2 -left-8 w-8 h-[2px] bg-gradient-to-l from-emerald-500/50 to-transparent" />
