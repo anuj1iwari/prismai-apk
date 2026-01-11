@@ -667,26 +667,26 @@ export default function App() {
   const [userApiKey, setUserApiKey] = useState('');
 
   // ----------------------------------------------------------------------------------
-  // IMPORTANT FOR STACKBLITZ / LOCAL VITE:
-  // To enable .env support in StackBlitz or VS Code:
-  // 1. Create a .env file with VITE_GEMINI_API_KEY=your_key
-  // 2. UNCOMMENT the line below starting with 'const VITE_API_KEY = ...'
-  // 3. COMMENT OUT the line 'const VITE_API_KEY = "";'
+  // IMPORTANT: Ensure your .env file has VITE_GROQ_API_KEY=your_key_starting_with_gsk_
   // ----------------------------------------------------------------------------------
   
-  // UNCOMMENT THIS LINE FOR STACKBLITZ/VITE:
-  const VITE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY; 
-  
-  // COMMENT THIS LINE OUT WHEN USING .ENV:
-  //const VITE_API_KEY = ""; 
-
   useEffect(() => {
-    // Fallback: Read from localStorage if user previously entered it
+    // 1. Try to get from Vite Environment Variable
+    // Note: In some preview environments, import.meta.env might be empty or require specific config.
+    // We use a try-catch block to handle environments where import.meta might be undefined.
+    let envKey = '';
+    try {
+        // @ts-ignore
+        envKey = import.meta.env.VITE_GROQ_API_KEY || "";
+    } catch (e) {
+        console.warn("Could not read import.meta.env");
+    }
+
+    // 2. Fallback to localStorage
     const storedKey = localStorage.getItem('prism_api_key');
 
-    // Use the variable defined above
-    if (VITE_API_KEY) {
-        setUserApiKey(VITE_API_KEY);
+    if (envKey) {
+        setUserApiKey(envKey);
     } else if (storedKey) {
         setUserApiKey(storedKey);
     }
@@ -797,35 +797,66 @@ export default function App() {
             role: 'assistant' as const,
             modelId,
             modelName: modelInfo?.name,
-            content: `⚠️ **API Key Missing**: Please check if your \`.env\` file is set correctly with \`VITE_GEMINI_API_KEY\` and that you have uncommented the line in \`App.tsx\`.`,
+            content: `⚠️ **API Key Missing**: Please check if your \`.env\` file is set correctly with \`VITE_GROQ_API_KEY\` or enter it in App.tsx manually.`,
             timestamp: new Date(),
           };
         }
 
-        // TRICK: Hum har model ke liye Gemini API use karenge, par usse bolenge ki woh specific model ki tarah act kare.
+        // Map Internal Persona ID to Groq Model ID
+        // UPDATED: Using 'llama-3.3-70b-versatile' for all models to ensure stability as older models like gemma2-9b-it are decommissioned.
+        let groqModelId = 'llama-3.3-70b-versatile'; 
         let personaPrompt = "";
+
         switch(modelId) {
-          case 'gpt': personaPrompt = "You are ChatGPT 5, created by OpenAI. Answer concisely and clearly."; break;
-          case 'anthropic': personaPrompt = "You are Claude 3.7, created by Anthropic. Be helpful, harmless, and honest. Use a sophisticated tone."; break;
-          case 'perplexity': personaPrompt = "You are Perplexity Sonar. Focus on providing factual, up-to-date information."; break;
-          case 'xai': personaPrompt = "You are Grok 4 by xAI. Be witty, slightly rebellious, and direct."; break;
-          case 'deepseek': personaPrompt = "You are DeepSeek. Focus on logic, code, and technical accuracy."; break;
-          case 'blackbox': personaPrompt = "You are Blackbox AI. Focus strictly on programming and code solutions."; break;
-          default: personaPrompt = "You are Gemini 2.5 Pro by Google. Be helpful."; break;
+          case 'gpt': 
+            personaPrompt = "You are ChatGPT 5, created by OpenAI. Answer concisely and clearly."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
+          case 'anthropic': 
+            personaPrompt = "You are Claude 3.7, created by Anthropic. Be helpful, harmless, and honest. Use a sophisticated tone."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
+          case 'perplexity': 
+            personaPrompt = "You are Perplexity Sonar. Focus on providing factual, up-to-date information."; 
+            groqModelId = 'llama-3.3-70b-versatile'; 
+            break;
+          case 'xai': 
+            personaPrompt = "You are Grok 4 by xAI. Be witty, slightly rebellious, and direct."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
+          case 'deepseek': 
+            personaPrompt = "You are DeepSeek. Focus on logic, code, and technical accuracy."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
+          case 'blackbox': 
+            personaPrompt = "You are Blackbox AI. Focus strictly on programming and code solutions."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
+          case 'gemini':
+            personaPrompt = "You are Gemini 2.5 Pro by Google. Be helpful."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
+          default: 
+            personaPrompt = "You are a helpful AI assistant."; 
+            groqModelId = 'llama-3.3-70b-versatile';
+            break;
         }
 
-        const callGemini = async (modelName: string) => {
+        const callGroq = async () => {
             const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+            `https://api.groq.com/openai/v1/chat/completions`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
               body: JSON.stringify({ 
-                contents: [{ 
-                  parts: [{ 
-                    text: `${personaPrompt}\n\nUser Query: ${userMsg.content}` 
-                  }] 
-                }] 
+                model: groqModelId,
+                messages: [
+                  { role: "system", content: personaPrompt },
+                  { role: "user", content: userMsg.content }
+                ]
               }),
             }
           );
@@ -837,9 +868,8 @@ export default function App() {
         };
 
         try {
-          // Attempt 1: Try Gemini 2.5 Flash Preview (Requested)
-          const data = await callGemini('gemini-2.5-flash-preview-09-2025');
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content found.";
+          const data = await callGroq();
+          const text = data.choices?.[0]?.message?.content || "No response content found.";
           
           return {
             role: 'assistant' as const,
@@ -849,31 +879,14 @@ export default function App() {
             timestamp: new Date(),
           };
         } catch (error: any) {
-          // Attempt 2: Fallback to Gemini 1.5 Flash (More stable/Higher Limits)
-          console.warn(`Gemini 2.5 failed for ${modelId}, falling back to 1.5-flash. Error: ${error.message}`);
-          
-          try {
-             // Adding a small delay before retry to help with rate limits
-             await new Promise(r => setTimeout(r, 1000));
-             const data = await callGemini('gemini-1.5-flash');
-             const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content found.";
-             return {
-                role: 'assistant' as const,
-                modelId,
-                modelName: modelInfo?.name,
-                content: text,
-                timestamp: new Date(),
-             };
-          } catch (retryError: any) {
-             console.error("API Error Details:", retryError);
+             console.error("API Error Details:", error);
              return {
               role: 'assistant' as const,
               modelId,
               modelName: modelInfo?.name,
-              content: `Error: ${retryError.message || "Could not connect to AI Service. Please check your API Key."}`,
+              content: `Error: ${error.message || "Could not connect to AI Service. Please check your API Key."}`,
               timestamp: new Date(),
             };
-          }
         }
       };
 
