@@ -656,7 +656,7 @@ const LandingSection: React.FC<{ children: React.ReactNode; className?: string; 
 
 export default function App() {
   const [view, setView] = useState<'landing' | 'signin' | 'chat'>('landing');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to false on mobile, handled below
   const [showModelModal, setShowModelModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -706,6 +706,13 @@ export default function App() {
   const [confidenceMode, setConfidenceMode] = useState('Balanced');
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Responsive sidebar init
+  useEffect(() => {
+    if (window.innerWidth >= 768) {
+      setIsSidebarOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     // This effect is mainly a placeholder for logic that might sync models
@@ -893,8 +900,8 @@ export default function App() {
       // Execute requests sequentially to respect Rate Limits (5 RPM on free tier)
       for (const modelId of modelsToProcess) {
          if (isMultiChat) {
-            // Add substantial delay between requests in multi-chat to avoid 429 errors
-            await new Promise(resolve => setTimeout(resolve, 2500)); 
+           // Add substantial delay between requests in multi-chat to avoid 429 errors
+           await new Promise(resolve => setTimeout(resolve, 2500)); 
          }
          
          const responseMsg = await fetchResponse(modelId);
@@ -1423,14 +1430,14 @@ export default function App() {
                 </button>
               </div>
             </motion.div>
-            <div className="relative mt-20 h-[400px] md:h-[500px] w-full max-w-5xl mx-auto">
+            <div className="relative mt-20 h-auto md:h-[500px] w-full max-w-5xl mx-auto">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8 }}
-                className={`absolute inset-0 rounded-xl border border-emerald-500/30 ${
+                className={`relative md:absolute inset-0 rounded-xl border border-emerald-500/30 ${
                   isDark ? 'bg-[#0f0f0f]' : 'bg-white'
-                } shadow-2xl shadow-emerald-900/20 overflow-hidden flex flex-col items-center justify-center p-8`}
+                } shadow-2xl shadow-emerald-900/20 overflow-hidden flex flex-col items-center justify-center p-6 md:p-8`}
               >
                 <div className="text-center mb-8">
                   <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -1443,12 +1450,12 @@ export default function App() {
                     Unlock the power of 7 premium AIs
                   </p>
                 </div>
-                <div className="grid grid-cols-3 gap-4 w-full max-w-3xl">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
                   {MODELS.map((m) => (
                     <div
                       key={m.id}
                       className={`${isDark ? 'bg-[#1a1a1a]' : 'bg-gray-50'} ${
-                        m.id === 'blackbox' ? 'col-start-2' : ''
+                        m.id === 'blackbox' ? 'sm:col-start-2' : ''
                       } p-3 rounded-lg border ${
                         theme.border
                       } flex items-center gap-3`}
@@ -1518,10 +1525,10 @@ export default function App() {
             {LANDING_FEATURES.map((feature, idx) => (
               <div
                 key={idx}
-                className="sticky top-0 h-screen flex items-center justify-center"
+                className="sticky top-0 min-h-screen md:h-screen flex items-center justify-center"
                 style={{
                   zIndex: idx + 1,
-                  top: '80px',
+                  // top: '80px', // Removed manual top for mobile responsiveness, CSS sticky handles it best
                   marginBottom:
                     idx === LANDING_FEATURES.length - 1 ? '100px' : '0',
                 }}
@@ -1531,7 +1538,7 @@ export default function App() {
                     isDark ? 'bg-[#0f0f0f]' : 'bg-white'
                   } rounded-3xl border ${
                     theme.border
-                  } shadow-2xl overflow-hidden w-full h-[550px] flex flex-col transition-colors duration-300`}
+                  } shadow-2xl overflow-hidden w-full h-auto min-h-[500px] md:h-[550px] flex flex-col transition-colors duration-300 my-8 md:my-0`}
                 >
                   <div
                     className={`flex flex-col ${
@@ -2144,7 +2151,7 @@ export default function App() {
   // Chat View
   return (
     <div
-      className={`flex h-screen ${
+      className={`flex h-[100dvh] ${
         isDark ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'
       } overflow-hidden font-sans transition-colors duration-300`}
     >
@@ -2155,7 +2162,7 @@ export default function App() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -280, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 150 }}
-            className={`w-[280px] ${theme.sidebarBg} border-r ${theme.border} flex flex-col flex-shrink-0 z-20`}
+            className={`w-[280px] ${theme.sidebarBg} border-r ${theme.border} flex flex-col flex-shrink-0 z-20 absolute md:relative h-full`}
           >
             {/* Sidebar content */}
             <div className="p-5 flex items-center gap-3">
@@ -2311,9 +2318,9 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col relative min-w-0">
+      <div className="flex-1 flex flex-col relative min-w-0 h-full">
         <header
-          className={`h-16 border-b ${theme.border} ${theme.navBg} backdrop-blur-md flex items-center justify-between px-4 z-10 sticky top-0`}
+          className={`h-16 border-b ${theme.border} ${theme.navBg} backdrop-blur-md flex items-center justify-between px-4 z-10 sticky top-0 flex-shrink-0`}
         >
           <div className="flex items-center gap-2">
             {!isSidebarOpen && (
@@ -2563,7 +2570,7 @@ export default function App() {
             </div>
           ) : (
             <div
-              className={`relative z-10 max-w-6xl mx-auto pb-32 ${
+              className={`relative z-10 max-w-6xl mx-auto pb-8 ${
                 isMultiChat
                   ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
                   : 'flex flex-col space-y-6'
@@ -2706,11 +2713,11 @@ export default function App() {
         </main>
 
         {messages.length > 0 && (
-          <div className="absolute bottom-6 left-4 right-4 max-w-4xl mx-auto z-20">
+          <div className="p-4 border-t border-gray-800/50 bg-[#0f0f0f] relative z-20">
             <div
               className={`relative ${
                 isDark ? 'bg-[#1a1a1a]' : 'bg-white'
-              } border ${theme.border} rounded-2xl p-2 shadow-2xl`}
+              } border ${theme.border} rounded-2xl p-2 shadow-2xl max-w-4xl mx-auto`}
             >
               <div
                 className={`relative ${
