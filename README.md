@@ -1,73 +1,35 @@
-# React + TypeScript + Vite
+Prism AI 🌈
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Prism AI is an advanced AI aggregator platform that brings the world's most powerful AI models (such as GPT-5, Gemini 2.5 Pro, Claude 3.7, etc.) into a single, unified interface. Its goal is to provide users with the best AI experience without switching between different tabs.
 
-Currently, two official plugins are available:
+(Note: You can insert the actual screenshot of your application here)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+✨ Features
 
-## React Compiler
+Unified Chat Interface: All top AI models (OpenAI, Google, Anthropic, DeepSeek, etc.) are available in a single chat window.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Multi-Model Toggle: You decide which models remain active. Toggling models on/off is effortless.
 
-## Expanding the ESLint configuration
+🤖 Multi-Chat & Synthesis: Get responses from multiple AIs on a single prompt and view a consensus/summary via the "Prism Synthesis" feature.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+📱 Fully Mobile Responsive: Optimized UI for mobile users. Feature lists are scrollable, and the chat input adjusts perfectly with the keyboard (100dvh support).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+🌓 Dark/Light Mode: Aesthetic UI that looks perfect in both dark and light modes.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+⚡ Fast & Secure: Lightning-fast responses via Groq API integration.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Verification Loop: Cross-check any answer with another AI model using the "Verify" button.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+🛠️ Tech Stack
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+This project is built using modern web technologies:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Frontend: React + TypeScript
+
+Styling: Tailwind CSS (For responsive and aesthetic design)
+
+Animations: Framer Motion (For smooth interactions)
+
+Icons: Lucide React
+
+Build Tool: Vite
