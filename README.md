@@ -1,35 +1,28 @@
-Prism AI 🌈
+# **🌈 Prism AI**
 
-Prism AI is an advanced AI aggregator platform that brings the world's most powerful AI models (such as GPT-5, Gemini 2.5 Pro, Claude 3.7, etc.) into a single, unified interface. Its goal is to provide users with the best AI experience without switching between different tabs.
+**Prism AI** is an advanced AI aggregator platform designed to unify the world's most powerful large language models into a single, seamless interface. Instead of switching between dozens of tabs, Prism AI provides a central command center for interacting with models like **GPT-5, Gemini 2.5 Pro, Claude 3.7**, and more.
 
-(Note: You can insert the actual screenshot of your application here)
+## **✨ Features**
 
-✨ Features
+* **Unified Chat Interface**: Access OpenAI, Google, Anthropic, and DeepSeek models through a single, elegant chat window.  
+* **🤖 Multi-Chat & Synthesis**: Query multiple AI models simultaneously and get a consolidated consensus or summary via the exclusive **"Prism Synthesis"** feature.  
+* **Multi-Model Toggle**: Dynamic control over active models. Easily toggle specific AIs on or off depending on your workflow needs.  
+* **Verification Loop**: Built-in fact-checking mechanism that allows you to cross-reference an answer with a different model using the "Verify" button.  
+* **⚡ Ultra-Fast Performance**: Integrated with the **Groq API** for lightning-fast inference and near-instant response times.  
+* **📱 Precision Mobile Design**: Fully responsive UI with specific optimizations for mobile browsers, including 100dvh support for perfect keyboard interaction.  
+* **🌓 Adaptive Theming**: Beautifully crafted Dark and Light modes that adjust to your system preferences or manual choice.
 
-Unified Chat Interface: All top AI models (OpenAI, Google, Anthropic, DeepSeek, etc.) are available in a single chat window.
+## **🛠️ Tech Stack**
 
-Multi-Model Toggle: You decide which models remain active. Toggling models on/off is effortless.
+* **Frontend**: React 19 \+ TypeScript  
+* **Styling**: Tailwind CSS (Utility-first responsive design)  
+* **Animations**: Framer Motion (Smooth transitions and UI interactions)  
+* **Icons**: Lucide React  
+* **Build Tool**: Vite 6  
+* **API Layer**: Groq API & Model Aggregator Logic
 
-🤖 Multi-Chat & Synthesis: Get responses from multiple AIs on a single prompt and view a consensus/summary via the "Prism Synthesis" feature.
+## **📜 License**
 
-📱 Fully Mobile Responsive: Optimized UI for mobile users. Feature lists are scrollable, and the chat input adjusts perfectly with the keyboard (100dvh support).
+This project is licensed under the **MIT License**.
 
-🌓 Dark/Light Mode: Aesthetic UI that looks perfect in both dark and light modes.
-
-⚡ Fast & Secure: Lightning-fast responses via Groq API integration.
-
-Verification Loop: Cross-check any answer with another AI model using the "Verify" button.
-
-🛠️ Tech Stack
-
-This project is built using modern web technologies:
-
-Frontend: React + TypeScript
-
-Styling: Tailwind CSS (For responsive and aesthetic design)
-
-Animations: Framer Motion (For smooth interactions)
-
-Icons: Lucide React
-
-Build Tool: Vite
+**Designed and Built with ❤️ by [Anuj Tiwari](https://anujtiwari.vercel.app/)**
