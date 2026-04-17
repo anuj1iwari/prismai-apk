@@ -1,3 +1,5 @@
+<div align="center"> <img src="https://i.ibb.co/VW5D11Zv/Screenshot-2026-04-16-140316.png" alt="Prism AI Banner" width="100%"> </div>
+
 # **🌈 Prism AI**
 
 **Prism AI** is an advanced AI aggregator platform designed to unify the world's most powerful large language models into a single, seamless interface. Instead of switching between dozens of tabs, Prism AI provides a central command center for interacting with models like **GPT-5, Gemini 2.5 Pro, Claude 3.7**, and more.
