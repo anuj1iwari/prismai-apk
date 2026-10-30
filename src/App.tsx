@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from './lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import {
   MessageSquare,
   Settings,
@@ -67,6 +69,13 @@ interface Message {
   modelId?: string;
   modelName?: string;
   isVerification?: boolean;
+}
+interface Conversation {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ModelCharacteristic {
@@ -656,6 +665,55 @@ const LandingSection: React.FC<{ children: React.ReactNode; className?: string; 
 
 export default function App() {
   const [view, setView] = useState<'landing' | 'signin' | 'chat'>('landing');
+  const [email, setEmail] = useState('');
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
+  const displayName =
+  currentUser?.user_metadata?.full_name ||
+  currentUser?.user_metadata?.name ||
+  currentUser?.email?.split('@')[0] ||
+  'User';
+
+const avatarUrl =
+  currentUser?.user_metadata?.avatar_url ||
+  currentUser?.user_metadata?.picture ||
+  '';
+
+const userInitials = displayName
+  .split(' ')
+  .map((word: string) => word[0])
+  .join('')
+  .slice(0, 2)
+  .toUpperCase();
+  useEffect(() => {
+  let isMounted = true;
+
+supabase.auth.getSession().then(({ data: { session } }) => {
+  if (isMounted) {
+    setCurrentUser(session?.user ?? null);
+
+    if (session) {
+      setView('chat');
+    }
+  }
+});
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+  setCurrentUser(session.user);
+  setView('chat');
+} else {
+  setCurrentUser(null);
+  setView('landing');
+}
+  });
+
+  return () => {
+    isMounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to false on mobile, handled below
   const [showModelModal, setShowModelModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -695,6 +753,8 @@ export default function App() {
   const [activeModels, setActiveModels] = useState<string[]>(MODELS.map((m) => m.id));
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isMultiChat, setIsMultiChat] = useState(false);
   const [isSuperFiesta, setIsSuperFiesta] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
@@ -760,9 +820,18 @@ export default function App() {
     }
   };
 
-  const handleSignIn = () => {
-    setTimeout(() => setView('chat'), 800);
-  };
+const handleSignIn = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    alert(`Google Login Failed: ${error.message}`);
+  }
+};
 
   const toggleModel = (id: string) => {
     if (activeModels.includes(id)) {
@@ -776,11 +845,83 @@ export default function App() {
       setActiveModels([...activeModels, id]);
     }
   };
+  const createNewConversation = async () => {
+  if (!currentUser) return;
 
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert({
+      user_id: currentUser.id,
+      title: 'New Chat',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('New conversation error:', error.message);
+    return;
+  }
+
+  setConversations((prev) => [data, ...prev]);
+  setCurrentConversationId(data.id);
+  setMessages([]);
+};
+  const openConversation = (conversationId: string) => {
+  setCurrentConversationId(conversationId);
+  setMessages([]);
+};
+const saveChatMessage = async (
+  role: 'user' | 'assistant' | 'synthesis',
+  content: string,
+  conversationId: string | null
+) => {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || !conversationId) return;
+
+    const { error } = await supabase.from('chat_messages').insert({
+      user_id: user.id,
+      role,
+      conversation_id: conversationId,
+      content,
+    });
+
+    if (error) {
+      console.error('Chat save error:', error.message);
+    }
+  } catch (error) {
+    console.error('Chat save error:', error);
+  }
+};
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg: Message = { role: 'user', content: input, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
+    if (currentConversationId) {
+      void saveChatMessage('user', userMsg.content, currentConversationId);
+      const chatTitle = userMsg.content.trim().slice(0, 40);
+
+if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Chat') {
+  const { error } = await supabase
+    .from('conversations')
+    .update({
+      title: chatTitle,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', currentConversationId);
+
+  if (!error) {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === currentConversationId ? { ...c, title: chatTitle } : c
+      )
+    );
+  }
+}
+    }
     setInput('');
     setProcessing(true);
 
@@ -906,6 +1047,7 @@ export default function App() {
          
          const responseMsg = await fetchResponse(modelId);
          setMessages((prev) => [...prev, responseMsg]);
+         void saveChatMessage('assistant', responseMsg.content, currentConversationId);
       }
 
       if (isSuperFiesta) {
@@ -918,6 +1060,11 @@ export default function App() {
               timestamp: new Date(),
             },
           ]);
+          void saveChatMessage(
+  'synthesis',
+  'PRISM SYNTHESIS: Jury Consensus: 9.8/10 — No Contradictions Detected.',
+  currentConversationId
+);
           setProcessing(false);
         }, 1000);
       } else {
@@ -955,10 +1102,69 @@ export default function App() {
         timestamp: new Date(),
         isVerification: true,
       };
+      void saveChatMessage('assistant', verificationMsg.content, currentConversationId);
       setMessages((prev) => [...prev, verificationMsg]);
       setProcessing(false);
     }, 1500);
   };
+  useEffect(() => {
+  if (!currentUser) {
+    setConversations([]);
+    setCurrentConversationId(null);
+    return;
+  }
+
+  const loadConversations = async () => {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Conversation history error:', error.message);
+      return;
+    }
+
+    setConversations(data || []);
+    if (data && data.length > 0) {
+  setCurrentConversationId(data[0].id);
+} else {
+  void createNewConversation();
+}
+  };
+
+  void loadConversations();
+}, [currentUser?.id]);
+  useEffect(() => {
+  if (!currentUser || !currentConversationId) return;
+
+  const loadChatMessages = async () => {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('id, role, content, created_at')
+      .eq('user_id', currentUser.id)
+      .eq('conversation_id', currentConversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Chat history load error:', error.message);
+      return;
+    }
+
+    if (data) {
+      setMessages(
+        data.map((msg) => ({
+          role: msg.role as Message['role'],
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+        }))
+      );
+    }
+  };
+
+  void loadChatMessages();
+}, [currentUser?.id, currentConversationId]);
 
   const AttachMenu: React.FC<{ dropUp?: boolean }> = ({ dropUp = true }) => (
     <motion.div
@@ -1164,12 +1370,38 @@ export default function App() {
               <div className="space-y-6">
                 <div className="flex items-center gap-6 mb-8">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-xl">
-                    AT
+                    {avatarUrl ? (
+  <img
+    src={avatarUrl}
+    alt={displayName}
+    className="w-full h-full rounded-full object-cover"
+  />
+) : (
+  userInitials
+)}
                   </div>
                   <div>
-                    <h4 className="text-xl font-bold">Anuj Tiwari</h4>
-                    <p className={theme.textMuted}>anuj@prismai.ai</p>
-                    <button className="mt-2 text-sm text-emerald-500 font-medium hover:underline">
+                    <h4 className="text-xl font-bold">{displayName}</h4>
+                    <p className={theme.textMuted}>{currentUser?.email}</p>
+                    <button
+  onClick={async () => {
+    const newName = prompt('Enter your new display name:', displayName);
+
+    if (!newName || !newName.trim()) return;
+
+    const { data, error } = await supabase.auth.updateUser({
+      data: { full_name: newName.trim() }
+    });
+
+    if (error) {
+      alert(`Profile update failed: ${error.message}`);
+    } else if (data.user) {
+      setCurrentUser(data.user);
+      alert('Profile name updated successfully!');
+    }
+  }}
+  className="mt-2 text-sm text-emerald-500 font-medium hover:underline"
+>
                       Edit Profile
                     </button>
                   </div>
@@ -1181,7 +1413,7 @@ export default function App() {
                   </label>
                   <input
                     type="text"
-                    value="Anuj Tiwari"
+                    value={displayName}
                     readOnly
                     className={`w-full p-3 rounded-xl border ${theme.border} bg-transparent`}
                   />
@@ -1191,7 +1423,7 @@ export default function App() {
                   </label>
                   <input
                     type="email"
-                    value="anuj@prismai.ai"
+                    value={currentUser?.email || ''}
                     className={`w-full p-3 rounded-xl border ${theme.border} bg-transparent`}
                     disabled
                   />
@@ -2130,6 +2362,8 @@ export default function App() {
               <input
                 type="email"
                 placeholder="Enter your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className={`w-full ${theme.inputBg} border ${
                   theme.border
                 } rounded-lg px-4 py-3 ${
@@ -2139,7 +2373,29 @@ export default function App() {
                 }`}
               />
             </div>
-            <button className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-emerald-500/20">
+            <button
+  type="button"
+  onClick={async () => {
+    if (!email.trim()) {
+      alert('Please enter your email address');
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      alert('Login link sent! Please check your email.');
+    }
+  }}
+  className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500"
+> 
               <span className="text-sm">Log In with Email</span>
             </button>
           </div>
@@ -2219,6 +2475,7 @@ export default function App() {
             <div className="px-4 mb-6">
               <button
                 className={`w-full flex items-center gap-2 text-sm font-medium ${theme.textMuted} hover:${theme.text} ${theme.hoverBg} px-3 py-2 rounded-lg transition-colors`}
+                onClick={() => void createNewConversation()}
               >
                 <MessageSquare className="w-4 h-4" /> New chat
               </button>
@@ -2226,6 +2483,27 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto px-4 space-y-6">
               <div>
+                <div className="mb-4">
+  <div className={`text-xs font-semibold uppercase tracking-wider ${theme.textMuted} mb-2 px-2`}>
+    Chat History
+  </div>
+
+  <div className="space-y-1">
+    {conversations.map((conversation) => (
+      <button
+        key={conversation.id}
+        onClick={() => openConversation(conversation.id)}
+        className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate ${
+          currentConversationId === conversation.id
+            ? theme.activeBg
+            : theme.hoverBg
+        } ${theme.text}`}
+      >
+        {conversation.title}
+      </button>
+    ))}
+  </div>
+</div>
                 <div
                   className={`flex items-center justify-between text-xs font-semibold ${theme.textMuted} uppercase tracking-wider mb-3 px-2`}
                 >
@@ -2294,12 +2572,20 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-3 px-2">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
-                  AT
-                </div>
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
+  {avatarUrl ? (
+    <img
+      src={avatarUrl}
+      alt={displayName}
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    userInitials
+  )}
+</div>
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm font-medium truncate ${theme.text}`}>
-                    Anuj Tiwari
+                    {displayName}
                   </div>
                 </div>
                 <Settings
@@ -2381,7 +2667,13 @@ export default function App() {
               )}
             </button>
             <button
-              onClick={() => setView('landing')}
+              onClick={async () => {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert(`Logout failed: ${error.message}`);
+  }
+}}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all border ${
                 isDark
                   ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
