@@ -810,42 +810,42 @@ export default function App() {
         }
 
         // Map Internal Persona ID to Groq Model ID
-        // UPDATED: Using 'llama-3.3-70b-versatile' for all models to ensure stability as older models like gemma2-9b-it are decommissioned.
-        let groqModelId = 'llama-3.3-70b-versatile'; 
+        // UPDATED: Using 'openai/gpt-oss-120b' for all models to ensure stability as older models like gemma2-9b-it are decommissioned.
+        let groqModelId = 'openai/gpt-oss-120b'; 
         let personaPrompt = "";
 
         switch(modelId) {
           case 'gpt': 
             personaPrompt = "You are ChatGPT 5, created by OpenAI. Answer concisely and clearly."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
           case 'anthropic': 
             personaPrompt = "You are Claude 3.7, created by Anthropic. Be helpful, harmless, and honest. Use a sophisticated tone."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
           case 'perplexity': 
             personaPrompt = "You are Perplexity Sonar. Focus on providing factual, up-to-date information."; 
-            groqModelId = 'llama-3.3-70b-versatile'; 
+            groqModelId = 'openai/gpt-oss-120b'; 
             break;
           case 'xai': 
             personaPrompt = "You are Grok 4 by xAI. Be witty, slightly rebellious, and direct."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
           case 'deepseek': 
             personaPrompt = "You are DeepSeek. Focus on logic, code, and technical accuracy."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
           case 'blackbox': 
             personaPrompt = "You are Blackbox AI. Focus strictly on programming and code solutions."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
           case 'gemini':
             personaPrompt = "You are Gemini 2.5 Pro by Google. Be helpful."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
           default: 
             personaPrompt = "You are a helpful AI assistant."; 
-            groqModelId = 'llama-3.3-70b-versatile';
+            groqModelId = 'openai/gpt-oss-120b';
             break;
         }
 
