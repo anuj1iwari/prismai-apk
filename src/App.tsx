@@ -448,7 +448,7 @@ const CARDS: CardItem[] = [
     title: 'Albert Einstein',
     desc: 'Revolutionized science, imagination beyond known limits.',
     image:
-      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Albert_Einstein_Head.jpg/800px-Albert_Einstein_Head.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Albert_Einstein_Head.jpg/500px-Albert_Einstein_Head.jpg',
   },
   {
     title: 'Career Coach',
@@ -752,13 +752,18 @@ supabase.auth.getSession().then(({ data: { session } }) => {
 
   const [activeModels, setActiveModels] = useState<string[]>(MODELS.map((m) => m.id));
   const [input, setInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isMultiChat, setIsMultiChat] = useState(false);
   const [isSuperFiesta, setIsSuperFiesta] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [isDark, setIsDark] = useState(true);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -865,10 +870,59 @@ const handleSignIn = async () => {
   setConversations((prev) => [data, ...prev]);
   setCurrentConversationId(data.id);
   setMessages([]);
+  return data.id;
 };
   const openConversation = (conversationId: string) => {
   setCurrentConversationId(conversationId);
   setMessages([]);
+};
+const deleteConversations = async (conversationIds: string[]) => {
+  if (!currentUser || conversationIds.length === 0) return;
+
+  const confirmed = window.confirm(
+    `Are you sure you want to delete ${conversationIds.length} conversation(s)?`
+  );
+
+  if (!confirmed) return;
+
+  const { error: messagesError } = await supabase
+    .from('chat_messages')
+    .delete()
+    .eq('user_id', currentUser.id)
+    .in('conversation_id', conversationIds);
+
+  if (messagesError) {
+    alert('Failed to delete chat messages.');
+    console.error(messagesError);
+    return;
+  }
+
+  const { error: conversationsError } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('user_id', currentUser.id)
+    .in('id', conversationIds);
+
+  if (conversationsError) {
+    alert('Failed to delete conversations.');
+    console.error(conversationsError);
+    return;
+  }
+
+  setConversations((prev) =>
+    prev.filter((conversation) => !conversationIds.includes(conversation.id))
+  );
+
+  setSelectedConversationIds([]);
+
+  if (
+    currentConversationId &&
+    conversationIds.includes(currentConversationId)
+  ) {
+    setCurrentConversationId(null);
+    setMessages([]);
+    void createNewConversation();
+  }
 };
 const saveChatMessage = async (
   role: 'user' | 'assistant' | 'synthesis',
@@ -896,32 +950,52 @@ const saveChatMessage = async (
     console.error('Chat save error:', error);
   }
 };
+const handleStop = () => {
+  abortControllerRef.current?.abort();
+  abortControllerRef.current = null;
+  setProcessing(false);
+};
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg: Message = { role: 'user', content: input, timestamp: new Date() };
+    let conversationId = currentConversationId;
+
+if (!conversationId) {
+  const blankConversation = conversations.find(
+    (c) => c.title === 'New Chat'
+  );
+
+  conversationId =
+    blankConversation?.id ?? (await createNewConversation());
+
+  if (conversationId) {
+    setCurrentConversationId(conversationId);
+  }
+}
+
+if (!conversationId) return;
     setMessages((prev) => [...prev, userMsg]);
-    if (currentConversationId) {
-      void saveChatMessage('user', userMsg.content, currentConversationId);
+    if (conversationId) 
+      void saveChatMessage('user', userMsg.content, conversationId);
       const chatTitle = userMsg.content.trim().slice(0, 40);
 
-if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Chat') {
+if (conversations.find((c) => c.id === conversationId)?.title === 'New Chat') {
   const { error } = await supabase
     .from('conversations')
     .update({
       title: chatTitle,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', currentConversationId);
+    .eq('id', conversationId);
 
   if (!error) {
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === currentConversationId ? { ...c, title: chatTitle } : c
+        c.id === conversationId ? { ...c, title: chatTitle } : c
       )
     );
   }
 }
-    }
     setInput('');
     setProcessing(true);
 
@@ -991,10 +1065,14 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
         }
 
         const callGroq = async () => {
-            const response = await fetch(
+  const controller = new AbortController();
+  abortControllerRef.current = controller;
+
+  const response = await fetch(
             `https://api.groq.com/openai/v1/chat/completions`,
             {
               method: 'POST',
+              signal: controller.signal,
               headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
@@ -1027,6 +1105,16 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
             timestamp: new Date(),
           };
         } catch (error: any) {
+          if (error?.name === 'AbortError') {
+            abortControllerRef.current = null;
+            return {
+    role: 'assistant' as const,
+    modelId,
+    modelName: modelInfo?.name,
+    content: 'Generation stopped.',
+    timestamp: new Date(),
+  };
+}
              console.error("API Error Details:", error);
              return {
               role: 'assistant' as const,
@@ -1107,12 +1195,15 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
       setProcessing(false);
     }, 1500);
   };
-  useEffect(() => {
+useEffect(() => {
   if (!currentUser) {
     setConversations([]);
     setCurrentConversationId(null);
+    setMessages([]);
     return;
   }
+
+  let cancelled = false;
 
   const loadConversations = async () => {
     const { data, error } = await supabase
@@ -1121,20 +1212,27 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
       .eq('user_id', currentUser.id)
       .order('updated_at', { ascending: false });
 
+    if (cancelled) return;
+
     if (error) {
       console.error('Conversation history error:', error.message);
       return;
     }
 
     setConversations(data || []);
-    if (data && data.length > 0) {
-  setCurrentConversationId(data[0].id);
-} else {
-  void createNewConversation();
-}
+    console.log("CHAT HISTORY DATA:", data);
+
+    // Always start with a fresh blank chat after login.
+    setCurrentConversationId(null);
+setMessages([]);
+
   };
 
   void loadConversations();
+
+  return () => {
+    cancelled = true;
+  };
 }, [currentUser?.id]);
   useEffect(() => {
   if (!currentUser || !currentConversationId) return;
@@ -2394,7 +2492,7 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
       alert('Login link sent! Please check your email.');
     }
   }}
-  className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500"
+  className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-xl border border-emerald-400/30 px-4 py-3 transition-all duration-200"
 > 
               <span className="text-sm">Log In with Email</span>
             </button>
@@ -2403,7 +2501,100 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
       </div>
     );
   }
+const handleSubscribe = async (planType: "monthly" | "yearly") => {
+    try {
+      setPaymentLoading(true);
 
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+
+      if (!session) {
+        throw new Error("Please login first");
+      }
+
+      const { data, error } = await supabase.functions.invoke(
+        "create-subscription",
+        {
+          body: { planType },
+        }
+      );
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || "Subscription creation failed");
+      }
+
+      const loadRazorpay = () =>
+        new Promise<boolean>((resolve) => {
+          if ((window as any).Razorpay) {
+            resolve(true);
+            return;
+          }
+
+          const script = document.createElement("script");
+          script.src = "https://checkout.razorpay.com/v1/checkout.js";
+          script.onload = () => resolve(true);
+          script.onerror = () => resolve(false);
+          document.body.appendChild(script);
+        });
+
+      const loaded = await loadRazorpay();
+
+      if (!loaded) {
+        throw new Error("Razorpay checkout could not be loaded");
+      }
+
+      const options = {
+        key: data.keyId,
+        subscription_id: data.subscriptionId,
+        name: "Prism AI",
+        description: planType === "monthly" ? "Monthly Premium Plan" : "Yearly Premium Plan",
+
+        handler: async (response: any) => {
+          try {
+            const { data: verification, error: verifyError } =
+              await supabase.functions.invoke("verify-payment", {
+                body: {
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_subscription_id: response.razorpay_subscription_id,
+                  razorpay_signature: response.razorpay_signature,
+                },
+              });
+
+            if (verifyError || !verification?.success) {
+              throw new Error(verification?.error || "Payment verification failed");
+            }
+
+            setIsPremium(true);
+            setShowUpgradeModal(false);
+            alert("Premium activated successfully!");
+          } catch (error: any) {
+            alert(error.message || "Payment verification failed");
+          } finally {
+            setPaymentLoading(false);
+          }
+        },
+
+        modal: {
+          ondismiss: () => setPaymentLoading(false),
+        },
+
+        prefill: {
+          email: session.user.email || "",
+        },
+
+        theme: {
+          color: "#10b981",
+        },
+      };
+
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.open();
+
+    } catch (error: any) {
+      alert(error.message || "Something went wrong");
+      setPaymentLoading(false);
+    }
+  };
   // Chat View
   return (
     <div
@@ -2465,10 +2656,12 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
               >
                 <Search className="w-4 h-4" />
                 <input
-                  type="text"
-                  placeholder="Search"
-                  className="bg-transparent border-none outline-none text-sm w-full placeholder-current"
-                />
+  type="text"
+  placeholder="Search"
+  value={searchQuery}
+  onChange={(e) => setSearchQuery(e.target.value)}
+  className="bg-transparent border-none outline-none text-sm w-full placeholder-current"
+/>
               </div>
             </div>
 
@@ -2487,22 +2680,76 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
   <div className={`text-xs font-semibold uppercase tracking-wider ${theme.textMuted} mb-2 px-2`}>
     Chat History
   </div>
+{conversations.length > 0 && (
+  <div className="flex items-center justify-between gap-2 mb-3">
+    <button
+      onClick={() =>
+        setSelectedConversationIds(
+          selectedConversationIds.length === conversations.length
+            ? []
+            : conversations.map((c) => c.id)
+        )
+      }
+      className="text-xs px-3 py-2 rounded-lg border border-white/10 hover:bg-white/10"
+    >
+      {selectedConversationIds.length === conversations.length
+        ? 'Deselect All'
+        : 'Select All'}
+    </button>
 
+    <button
+      onClick={() => deleteConversations(selectedConversationIds)}
+      disabled={selectedConversationIds.length === 0}
+      className="text-xs px-3 py-2 rounded-lg bg-red-500 text-white disabled:opacity-40"
+    >
+      Delete Selected ({selectedConversationIds.length})
+    </button>
+  </div>
+)}
   <div className="space-y-1">
-    {conversations.map((conversation) => (
+  {conversations.filter((conversation) =>
+  conversation.title
+    .toLowerCase()
+    .includes(searchQuery.trim().toLowerCase())
+).map((conversation) => (
+    <div
+      key={conversation.id}
+      className="group flex items-center gap-1"
+    >
+      <input
+        type="checkbox"
+        checked={selectedConversationIds.includes(conversation.id)}
+        onChange={(e) => {
+          setSelectedConversationIds((prev) =>
+            e.target.checked
+              ? [...prev, conversation.id]
+              : prev.filter((id) => id !== conversation.id)
+          );
+        }}
+        className="accent-emerald-500"
+      />
+
       <button
-        key={conversation.id}
         onClick={() => openConversation(conversation.id)}
-        className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate ${
+        className={`flex-1 min-w-0 text-left px-3 py-2 rounded-lg text-sm truncate ${
           currentConversationId === conversation.id
-            ? theme.activeBg
+            ? theme.navBg
             : theme.hoverBg
         } ${theme.text}`}
       >
         {conversation.title}
       </button>
-    ))}
-  </div>
+
+      <button
+        onClick={() => deleteConversations([conversation.id])}
+        title="Delete conversation"
+        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  ))}
+</div>
 </div>
                 <div
                   className={`flex items-center justify-between text-xs font-semibold ${theme.textMuted} uppercase tracking-wider mb-3 px-2`}
@@ -2556,7 +2803,7 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
                   <div className="w-0 bg-green-500 h-full" />
                 </div>
                 <button
-                  onClick={() => setIsPremium(true)}
+                  onClick={() => setShowUpgradeModal(true)}
                   className={`w-full py-2 ${
                     isDark
                       ? 'bg-white/5 hover:bg-white/10'
@@ -2868,6 +3115,31 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
                   : 'flex flex-col space-y-6'
               }`}
             >
+            <div className="sticky top-0 z-30 flex items-center gap-2 mb-6 py-2">
+  <button
+    onClick={() => setIsMultiChat(!isMultiChat)}
+    className={`px-4 py-2 rounded-full border flex items-center gap-2 text-sm font-medium ${
+      isMultiChat
+        ? 'bg-white/10 border-white/20 text-emerald-500'
+        : 'border-white/10 text-gray-500'
+    }`}
+  >
+    <LayoutGrid className="w-4 h-4" />
+    Multi-Chat
+  </button>
+
+  <button
+    onClick={() => setIsSuperFiesta(!isSuperFiesta)}
+    className={`px-4 py-2 rounded-full border flex items-center gap-2 text-sm font-medium ${
+      isSuperFiesta
+        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-500'
+        : 'border-white/10 text-gray-500'
+    }`}
+  >
+    <Zap className="w-4 h-4" />
+    Prism Synthesis
+  </button>
+</div>
               {messages.map((msg, idx) => {
                 if (msg.role === 'user') {
                   return (
@@ -3042,15 +3314,21 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
                   className={`flex-1 bg-transparent border-none outline-none ${theme.text} placeholder-gray-500 h-10`}
                 />
                 <button
-                  onClick={handleSend}
-                  className={`p-2 rounded-lg transition-all ${
-                    input.trim()
-                      ? 'bg-emerald-500 text-white'
-                      : `${theme.hoverBg} ${theme.textMuted}`
-                  }`}
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+  onClick={processing ? handleStop : handleSend}
+  className={`p-2 rounded-lg transition-all ${
+    processing
+      ? 'bg-red-500 text-white'
+      : input.trim()
+        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+        : `${theme.hoverBg} ${theme.textMuted}`
+  }`}
+>
+  {processing ? (
+    <span className="text-sm font-bold">■</span>
+  ) : (
+    <Send className="w-4 h-4" />
+  )}
+</button>
               </div>
             </div>
           </div>
@@ -3153,7 +3431,7 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
                 </button>
                 {!isPremium && (
                   <button
-                    onClick={() => setIsPremium(true)}
+                    onClick={() => setShowUpgradeModal(true)}
                     className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     <Zap className="w-4 h-4 fill-current" /> Upgrade and Unlock
@@ -3168,6 +3446,51 @@ if (conversations.find((c) => c.id === currentConversationId)?.title === 'New Ch
 
       <AnimatePresence>
         {showSettingsModal && <SettingsModal />}
+        {showUpgradeModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className={`w-full max-w-md rounded-2xl p-6 border ${theme.cardBg} ${theme.border}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className={`text-2xl font-bold ${theme.text}`}>
+          Upgrade to Premium
+        </h2>
+        <button
+          onClick={() => setShowUpgradeModal(false)}
+          className="text-xl"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className={`p-4 rounded-xl border ${theme.border}`}>
+          <h3 className={`font-bold ${theme.text}`}>Monthly Plan</h3>
+          <p className={`text-2xl font-bold ${theme.text}`}>₹1,149</p>
+          <p className="text-sm text-gray-400 mb-3">Billed monthly</p>
+          <button
+            disabled={paymentLoading}
+            onClick={() => handleSubscribe("monthly")}
+            className="w-full rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white py-3 font-semibold disabled:opacity-50"
+          >
+            {paymentLoading ? "Please wait..." : "Choose Monthly"}
+          </button>
+        </div>
+
+        <div className={`p-4 rounded-xl border-2 border-emerald-500`}>
+          <h3 className={`font-bold ${theme.text}`}>Yearly Plan</h3>
+          <p className={`text-2xl font-bold ${theme.text}`}>₹11,490</p>
+          <p className="text-sm text-gray-400 mb-3">Billed yearly</p>
+          <button
+            disabled={paymentLoading}
+            onClick={() => handleSubscribe("yearly")}
+            className="w-full rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white py-3 font-semibold disabled:opacity-50"
+          >
+            {paymentLoading ? "Please wait..." : "Choose Yearly"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       </AnimatePresence>
     </div>
   );
