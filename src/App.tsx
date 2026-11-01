@@ -686,12 +686,31 @@ const userInitials = displayName
   .toUpperCase();
   useEffect(() => {
   let isMounted = true;
+const loadPremiumStatus = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('user_subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle();
 
+  if (!isMounted) return;
+
+  if (error) {
+    console.error('Premium status error:', error);
+    setIsPremium(false);
+    return;
+  }
+
+  setIsPremium(!!data);
+};
 supabase.auth.getSession().then(({ data: { session } }) => {
   if (isMounted) {
     setCurrentUser(session?.user ?? null);
 
     if (session) {
+      loadPremiumStatus(session.user.id);
       setView('chat');
     }
   }
@@ -701,12 +720,14 @@ supabase.auth.getSession().then(({ data: { session } }) => {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((_event, session) => {
     if (session) {
-  setCurrentUser(session.user);
-  setView('chat');
-} else {
-  setCurrentUser(null);
-  setView('landing');
-}
+      setCurrentUser(session.user);
+      loadPremiumStatus(session.user.id);
+      setView('chat');
+    } else {
+      setCurrentUser(null);
+      setIsPremium(false);
+      setView('landing');
+    }
   });
 
   return () => {
@@ -2783,26 +2804,40 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
               </div>
             </div>
 
-            <div className={`p-4 border-t ${theme.border} ${theme.sidebarBg}`}>
+            <div className={`p-4 pb-8 ${theme.sidebarBg}`}>
               <div
-                className={`${theme.cardBg} rounded-xl p-4 border ${theme.border} mb-4`}
+                className={`${theme.cardBg} rounded-xl p-2 mb-3 border ${
+  isPremium
+    ? 'border-green-400 shadow-[0_0_18px_rgba(74,222,128,0.35)]'
+    : theme.border
+}`}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className={`font-medium text-sm ${theme.text}`}>
-                    Free Plan
-                  </h3>
-                </div>
-                <div className={`text-xs ${theme.textMuted} mb-3`}>
-                  0 / 3 messages used
-                </div>
-                <div
-                  className={`w-full ${
-                    isDark ? 'bg-gray-800' : 'bg-gray-200'
-                  } h-1 rounded-full mb-3 overflow-hidden`}
-                >
-                  <div className="w-0 bg-green-500 h-full" />
-                </div>
-                <button
+  <h3 className={`font-medium text-sm ${theme.text}`}>
+    {isPremium ? (
+      <>Prism AI <span className="text-green-400">Premium</span></>
+    ) : "Free Plan"}
+  </h3>
+  {isPremium && <span className="text-2xl leading-none">👑</span>}
+</div>
+                <div className="mb-3">
+  {isPremium ? (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span className="text-4xl font-bold text-green-400 flex items-center">∞</span>
+        <span className="text-base font-semibold text-white flex items-center whitespace-nowrap">
+  Unlimited messages
+</span>
+      </div>
+    </div>
+  ) : (
+    <div className={`text-xs ${theme.textMuted}`}>
+      0 / 7 messages used
+    </div>
+  )}
+</div>
+                {!isPremium && (
+                  <button
                   onClick={() => setShowUpgradeModal(true)}
                   className={`w-full py-2 ${
                     isDark
@@ -2816,6 +2851,7 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
                 >
                   <Zap className="w-3 h-3 text-yellow-400" /> Upgrade plan
                 </button>
+                )}
               </div>
 
               <div className="flex items-center gap-3 px-2">
@@ -2930,11 +2966,6 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
               <LogOut className="w-4 h-4" />
               <span>Log out</span>
             </button>
-            {isPremium && (
-              <span className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 border border-yellow-500/30 px-2 py-1 rounded bg-yellow-500/10">
-                PRO
-              </span>
-            )}
           </div>
         </header>
 
