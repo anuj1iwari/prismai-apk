@@ -781,6 +781,7 @@ supabase.auth.getSession().then(({ data: { session } }) => {
   const [isMultiChat, setIsMultiChat] = useState(false);
   const [isSuperFiesta, setIsSuperFiesta] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [messagesUsed, setMessagesUsed] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -1018,13 +1019,20 @@ if (conversations.find((c) => c.id === conversationId)?.title === 'New Chat') {
   }
 }
     setInput('');
+
+    // Free Plan: Maximum 7 messages
+    if (!isPremium && messagesUsed >= 7) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     setProcessing(true);
 
     // ---------------------------------------------------------
     // API Key Configuration
     // Fixed: Uses User API Key (From .env or localStorage)
     // ---------------------------------------------------------
-    const apiKey = userApiKey; 
+    const apiKey = userApiKey;
 
     try {
       const modelsToProcess = isMultiChat ? activeModels : [activeModels[0]];
@@ -1148,6 +1156,7 @@ if (conversations.find((c) => c.id === conversationId)?.title === 'New Chat') {
       };
 
       // Execute requests sequentially to respect Rate Limits (5 RPM on free tier)
+      const collectedResponses: typeof messages = [];
       for (const modelId of modelsToProcess) {
          if (isMultiChat) {
            // Add substantial delay between requests in multi-chat to avoid 429 errors
@@ -1155,36 +1164,210 @@ if (conversations.find((c) => c.id === conversationId)?.title === 'New Chat') {
          }
          
          const responseMsg = await fetchResponse(modelId);
+         if (responseMsg.content && !responseMsg.content.startsWith('Error:') && responseMsg.content !== 'Generation stopped.') {
+  collectedResponses.push(responseMsg);
+         }
          setMessages((prev) => [...prev, responseMsg]);
          void saveChatMessage('assistant', responseMsg.content, currentConversationId);
-      }
-
+      };
+    if (!isPremium && collectedResponses.length > 0) {
+  setMessagesUsed((prev) => Math.min(prev + 1, 7));
+}
       if (isSuperFiesta) {
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
+  try {
+    if (collectedResponses.length === 0) {
+      throw new Error("No successful AI responses available for synthesis.");
+    }
+
+    const synthesisPrompt = collectedResponses
+      .map(
+        (item, index) =>
+          `Perspective ${index + 1} (${item.modelName || item.modelId}):\n${String(item.content || "").slice(0, 1500)}`
+      )
+      .join("\n\n--------------------\n\n");
+
+    const synthesisResponse = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
             {
-              role: 'synthesis',
-              content: `PRISM SYNTHESIS:\n\n⚖️ Jury Consensus: 9.8/10\n✅ No Contradictions Detected.\n\nAnalyzing responses... All AI models have provided their perspectives successfully.`,
-              timestamp: new Date(),
+              role: "system",
+              content: `You are Prism AI's expert synthesis engine.
+
+Analyze all supplied AI responses carefully.
+
+Return exactly three sections:
+
+🏆 JURY CONSENSUS
+- Identify the points where responses agree.
+- Give an overall consensus level: High, Medium, or Low.
+- Explain the reason. Never invent a numerical score.
+
+⚠️ CONTRADICTION DETECTION
+- Identify specific conflicting claims.
+- Mention which perspectives disagree.
+- If no contradictions are found, say so honestly.
+- Never invent contradictions.
+
+💡 FINAL SYNTHESIZED ANSWER
+- Combine the strongest useful information.
+- Preserve important disagreements and uncertainties.
+- Give one clear, accurate and balanced answer.
+
+Use only the supplied responses. Do not invent facts.`
             },
-          ]);
-          void saveChatMessage(
-  'synthesis',
-  'PRISM SYNTHESIS: Jury Consensus: 9.8/10 — No Contradictions Detected.',
-  currentConversationId
-);
-          setProcessing(false);
-        }, 1000);
-      } else {
-        setProcessing(false);
+            {
+              role: "user",
+              content: `Original user question:\n${userMsg.content}\n\nAI responses:\n${synthesisPrompt}`
+            }
+          ]
+        })
       }
+    );
+
+    if (!synthesisResponse.ok) {
+      const errorData = await synthesisResponse.json().catch(() => ({}));
+      throw new Error(
+        errorData.error?.message || "Synthesis API request failed."
+      );
+    }
+
+    const synthesisData = await synthesisResponse.json();
+
+    const synthesisText =
+      synthesisData.choices?.[0]?.message?.content;
+
+    if (!synthesisText) {
+      throw new Error("Synthesis returned an empty response.");
+    }
+
+    const synthesisMsg = {
+      role: "synthesis" as const,
+      content: synthesisText,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, synthesisMsg]);
+
+    void saveChatMessage(
+      "synthesis",
+      synthesisText,
+      currentConversationId
+    );
+
+  } catch (synthesisError) {
+    console.error("Prism Synthesis Error:", synthesisError);
+
+    const errorMessage =
+      synthesisError instanceof Error
+        ? synthesisError.message
+        : "Unknown synthesis error";
+
+    const errorMsg = {
+      role: "synthesis" as const,
+      content: `PRISM SYNTHESIS FAILED:\n${errorMessage}`,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, errorMsg]);
+  } finally {
+    setProcessing(false);
+  }
+} else {
+  setProcessing(false);
+}
     } catch (err) {
       console.error("Chat Error:", err);
       setProcessing(false);
     }
   };
+const handleImprove = async (index: number) => {
+  const originalMsg = messages[index];
 
+  if (!originalMsg?.content) return;
+
+  const apiKey = userApiKey;
+
+  if (!apiKey) {
+    alert("Please add your Groq API key first.");
+    return;
+  }
+
+  setProcessing(true);
+
+  try {
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an expert AI writing assistant. Improve the given answer for clarity, accuracy, structure and completeness. Preserve its original meaning. Return only the improved answer.",
+            },
+            {
+              role: "user",
+              content: originalMsg.content,
+            },
+          ],
+          max_tokens: 1500,
+          temperature: 0.4,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || "Improvement failed");
+    }
+
+    const improvedContent =
+      data.choices?.[0]?.message?.content;
+
+    if (!improvedContent) {
+      throw new Error("No improved response received.");
+    }
+
+    const improvedMsg: Message = {
+      ...originalMsg,
+      content: improvedContent,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) =>
+      prev.map((msg, i) => (i === index ? improvedMsg : msg))
+    );
+
+    void saveChatMessage(
+      "assistant",
+      improvedContent,
+      currentConversationId
+    );
+
+  } catch (error) {
+    console.error("Improve Error:", error);
+    alert(
+      error instanceof Error ? error.message : "Unable to improve answer."
+    );
+  } finally {
+    setProcessing(false);
+  }
+};
   const handleVerify = (index: number) => {
     const originalMsg = messages[index];
     // Find a verifier that is DIFFERENT from the original model
@@ -1202,19 +1385,7 @@ if (conversations.find((c) => c.id === conversationId)?.title === 'New Chat') {
     setProcessing(true);
 
     // Simulate verification delay
-    setTimeout(() => {
-      const verificationMsg: Message = {
-        role: 'assistant',
-        modelId: verifier.id,
-        modelName: `${verifier.name} (Verifier)`,
-        content: `🔍 **Verification Report**\n\nI have independently reviewed the answer provided by ${originalMsg.modelName}.\n\n**Verdict:** ✅ Accurate\n\n**Analysis:** The reasoning provided aligns with established facts. The logic flow is sound. \n\n**Additional Context:** One minor nuance to consider is that while technically correct, this answer assumes a standard context. In edge cases, results might vary.`,
-        timestamp: new Date(),
-        isVerification: true,
-      };
-      void saveChatMessage('assistant', verificationMsg.content, currentConversationId);
-      setMessages((prev) => [...prev, verificationMsg]);
-      setProcessing(false);
-    }, 1500);
+
   };
 useEffect(() => {
   if (!currentUser) {
@@ -2832,7 +3003,7 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
     </div>
   ) : (
     <div className={`text-xs ${theme.textMuted}`}>
-      0 / 7 messages used
+      {messagesUsed} / 7 messages used
     </div>
   )}
 </div>
@@ -3263,15 +3434,25 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
                       {!msg.isVerification && (
                         <div className="flex gap-2 mt-auto pt-3">
                           <button
-                            className={`text-xs ${theme.textMuted} hover:${theme.text} flex items-center gap-1 ${theme.hoverBg} px-2 py-1 rounded`}
-                          >
-                            <ImageIcon className="w-3 h-3" /> Copy
-                          </button>
+  onClick={async () => {
+    try {
+      await navigator.clipboard.writeText(msg.content);
+      alert("Copied successfully!");
+    } catch (error) {
+      console.error("Copy failed:", error);
+      alert("Unable to copy text.");
+    }
+  }}
+  className={`text-xs ${theme.textMuted} hover:${theme.text} flex items-center gap-1 ${theme.hoverBg}`}
+>
+  <ImageIcon className="w-3 h-3" /> Copy
+</button>
                           <button
-                            className={`text-xs ${theme.textMuted} hover:${theme.text} flex items-center gap-1 ${theme.hoverBg} px-2 py-1 rounded`}
-                          >
-                            <Sparkles className="w-3 h-3" /> Improve
-                          </button>
+  onClick={() => handleImprove(idx)}
+  className={`text-xs ${theme.textMuted} hover:${theme.text} flex items-center gap-1 ${theme.hoverBg}`}
+>
+  <Sparkles className="w-3 h-3" /> Improve
+</button>
                           <button
                             onClick={() => handleVerify(idx)}
                             className={`text-xs ${theme.textMuted} hover:text-emerald-400 flex items-center gap-1 ${theme.hoverBg} px-2 py-1 rounded transition-colors`}
