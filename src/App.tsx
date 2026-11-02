@@ -3322,6 +3322,39 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
                     </AnimatePresence>
                   </div>
 
+{selectedFile && (
+  <div className="flex items-center gap-3 mb-3 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5">
+    {selectedFile.type.startsWith('image/') ? (
+      <img
+        src={URL.createObjectURL(selectedFile)}
+        alt="Attachment preview"
+        className="w-14 h-14 object-cover rounded-lg"
+      />
+    ) : (
+      <div className="w-14 h-14 flex items-center justify-center rounded-lg bg-emerald-500/10">
+        <Paperclip className="w-6 h-6 text-emerald-400" />
+      </div>
+    )}
+
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium truncate">
+        {selectedFile.name}
+      </p>
+      <p className="text-xs text-gray-400">
+        Attachment ready
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => setSelectedFile(null)}
+      className="text-red-400 hover:text-red-300 text-lg px-2"
+    >
+      ✕
+    </button>
+  </div>
+)}
+
                   <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
