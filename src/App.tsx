@@ -69,6 +69,8 @@ interface Model {
 interface Message {
   role: 'user' | 'assistant' | 'synthesis';
   content: string;
+  imageUrl?: string;
+  attachmentName?: string;
   timestamp: Date;
   modelId?: string;
   modelName?: string;
@@ -1061,6 +1063,10 @@ ${extractedText.slice(0, 20000)}`;
 const userMsg: Message = {
   role: 'user',
   content: messageContent,
+  imageUrl: selectedFile?.type.startsWith('image/')
+    ? URL.createObjectURL(selectedFile)
+    : undefined,
+  attachmentName: selectedFile?.name,
   timestamp: new Date(),
 };
 
@@ -3488,6 +3494,20 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
                       <div
                         className={`${theme.chatUserBubble} px-4 py-3 rounded-2xl rounded-tr-sm max-w-2xl border ${theme.border} shadow-sm`}
                       >
+                        {msg.imageUrl && (
+  <div className="mb-3">
+    <img
+      src={msg.imageUrl}
+      alt={msg.attachmentName || "Attached image"}
+      className="max-w-full max-h-80 rounded-xl object-contain border border-white/10"
+    />
+    {msg.attachmentName && (
+      <p className="text-xs mt-1 opacity-70">
+        {msg.attachmentName}
+      </p>
+    )}
+  </div>
+)}
                         {msg.content}
                       </div>
                     </div>
