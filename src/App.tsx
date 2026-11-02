@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import mammoth from 'mammoth';
+import { createWorker } from 'tesseract.js';
 import { supabase } from './lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import {
@@ -49,7 +53,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 // --- Types & Interfaces ---
 
 interface Model {
@@ -663,6 +667,53 @@ const LandingSection: React.FC<{ children: React.ReactNode; className?: string; 
   );
 };
 
+const extractFileText = async (file: File): Promise<string> => {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+
+  if (extension === 'txt') {
+    return await file.text();
+  }
+
+  if (extension === 'docx') {
+    const result = await mammoth.extractRawText({
+      arrayBuffer: await file.arrayBuffer(),
+    });
+    return result.value;
+  }
+
+  if (extension === 'pdf') {
+    const pdf = await pdfjsLib.getDocument({
+      data: await file.arrayBuffer(),
+    }).promise;
+
+    let text = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+
+      text += content.items
+        .map((item: any) => item.str || '')
+        .join(' ') + '\n';
+    }
+
+    return text;
+  }
+
+  if (['jpg', 'jpeg', 'png'].includes(extension || '')) {
+    const worker = await createWorker('eng');
+
+    try {
+      const result = await worker.recognize(file);
+      return result.data.text;
+    } finally {
+      await worker.terminate();
+    }
+  }
+
+  throw new Error('Unsupported file format');
+};
+
 export default function App() {
   const [view, setView] = useState<'landing' | 'signin' | 'chat'>('landing');
   const [email, setEmail] = useState('');
@@ -788,6 +839,9 @@ supabase.auth.getSession().then(({ data: { session } }) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [isDark, setIsDark] = useState(true);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [attachmentText, setAttachmentText] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [heroIndex, setHeroIndex] = useState(0);
   const [confidenceMode, setConfidenceMode] = useState('Balanced');
@@ -978,8 +1032,39 @@ const handleStop = () => {
   setProcessing(false);
 };
   const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMsg: Message = { role: 'user', content: input, timestamp: new Date() };
+    if (!input.trim() && !selectedFile) return;
+
+let messageContent = input.trim();
+
+if (selectedFile) {
+  try {
+    const extractedText = await extractFileText(selectedFile);
+
+    if (!extractedText.trim()) {
+      alert('No readable text found in the selected file.');
+      return;
+    }
+
+    setAttachmentText(extractedText);
+
+    messageContent += `
+
+[Attached File: ${selectedFile.name}]
+
+${extractedText.slice(0, 20000)}`;
+  } catch (error) {
+    alert('Unable to read this file. Please try another file.');
+    return;
+  }
+}
+
+const userMsg: Message = {
+  role: 'user',
+  content: messageContent,
+  timestamp: new Date(),
+};
+
+setSelectedFile(null);
     let conversationId = currentConversationId;
 
 if (!conversationId) {
@@ -1469,6 +1554,10 @@ setMessages([]);
     >
       <button
         className={`flex items-center gap-3 px-4 py-2.5 ${theme.hoverBg} ${theme.text} text-sm transition-colors`}
+        onClick={() => {
+  fileInputRef.current?.click();
+  setShowAttachMenu(false);
+}}
       >
         <Paperclip className="w-4 h-4 text-emerald-500" /> Attach Files
       </button>
@@ -2795,6 +2884,17 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
         isDark ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'
       } overflow-hidden font-sans transition-colors duration-300`}
     >
+      <input
+  ref={fileInputRef}
+  type="file"
+  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png"
+  className="hidden"
+  onChange={(e) => {
+    const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
+    e.target.value = '';
+  }}
+/>
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div
