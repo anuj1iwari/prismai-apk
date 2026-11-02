@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://prismai-three.vercel.app/sitemap.xml
