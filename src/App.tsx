@@ -1005,7 +1005,12 @@ const deleteConversations = async (conversationIds: string[]) => {
 const saveChatMessage = async (
   role: 'user' | 'assistant' | 'synthesis',
   content: string,
-  conversationId: string | null
+  conversationId: string | null,
+  attachment?: {
+    path: string;
+    name: string;
+    mimeType: string;
+  }
 ) => {
   try {
     const {
@@ -1019,6 +1024,9 @@ const saveChatMessage = async (
       role,
       conversation_id: conversationId,
       content,
+      attachment_path: attachment?.path || null,
+      attachment_name: attachment?.name || null,
+      attachment_mime_type: attachment?.mimeType || null,
     });
 
     if (error) {
@@ -1089,7 +1097,67 @@ if (!conversationId) {
 if (!conversationId) return;
     setMessages((prev) => [...prev, userMsg]);
     if (conversationId) 
-      void saveChatMessage('user', userMsg.content, conversationId);
+      void (async () => {
+  try {
+    let attachment;
+
+    if (selectedFile && conversationId) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const safeFileName = selectedFile.name.replace(
+        /[^a-zA-Z0-9._-]/g,
+        '_'
+      );
+
+      const filePath = `${user.id}/${conversationId}/${crypto.randomUUID()}-${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat-attachments')
+        .upload(filePath, selectedFile, {
+          contentType: selectedFile.type,
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      attachment = {
+        path: filePath,
+        name: selectedFile.name,
+        mimeType: selectedFile.type,
+      };
+
+      if (selectedFile.type.startsWith('image/')) {
+        const { data } = await supabase.storage
+          .from('chat-attachments')
+          .createSignedUrl(filePath, 3600);
+
+        if (data?.signedUrl) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg === userMsg
+                ? { ...msg, imageUrl: data.signedUrl }
+                : msg
+            )
+          );
+        }
+      }
+    }
+
+    await saveChatMessage(
+      'user',
+      userMsg.content,
+      conversationId,
+      attachment
+    );
+  } catch (error) {
+    console.error('Attachment upload error:', error);
+    alert('File upload failed. Please try again.');
+  }
+})();
       const chatTitle = userMsg.content.trim().slice(0, 40);
 
 if (conversations.find((c) => c.id === conversationId)?.title === 'New Chat') {
@@ -1523,7 +1591,7 @@ setMessages([]);
   const loadChatMessages = async () => {
     const { data, error } = await supabase
       .from('chat_messages')
-      .select('id, role, content, created_at')
+      .select('id, role, content, created_at, attachment_path, attachment_name, attachment_mime_type')
       .eq('user_id', currentUser.id)
       .eq('conversation_id', currentConversationId)
       .order('created_at', { ascending: true });
@@ -1534,14 +1602,33 @@ setMessages([]);
     }
 
     if (data) {
-      setMessages(
-        data.map((msg) => ({
-          role: msg.role as Message['role'],
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-        }))
-      );
-    }
+  const loadedMessages = await Promise.all(
+    data.map(async (msg) => {
+      let imageUrl: string | undefined;
+
+      if (
+        msg.attachment_path &&
+        msg.attachment_mime_type?.startsWith('image/')
+      ) {
+        const { data: signedData } = await supabase.storage
+          .from('chat-attachments')
+          .createSignedUrl(msg.attachment_path, 3600);
+
+        imageUrl = signedData?.signedUrl;
+      }
+
+      return {
+        role: msg.role as Message['role'],
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        imageUrl,
+        attachmentName: msg.attachment_name || undefined,
+      };
+    })
+  );
+
+  setMessages(loadedMessages);
+}
   };
 
   void loadChatMessages();
