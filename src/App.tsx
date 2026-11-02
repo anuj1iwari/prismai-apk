@@ -1940,6 +1940,7 @@ setMessages([]);
                   Start Free Trial <ArrowRight className="w-5 h-5" />
                 </button>
                 <button
+                onClick={() => window.open('https://drive.google.com/file/d/1feeECIPDgdfuYKeQCoEFHe1f1gtPqkdw/view', '_blank', 'noopener,noreferrer')}
                   className={`w-full sm:w-auto px-8 py-4 ${
                     isDark
                       ? 'bg-white/5 hover:bg-white/10'
