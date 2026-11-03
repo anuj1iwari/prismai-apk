@@ -1627,7 +1627,18 @@ setMessages([]);
     })
   );
 
-  setMessages(loadedMessages);
+  setMessages((prev) => {
+  const newMessages = prev.filter(
+    (localMsg) =>
+      !loadedMessages.some(
+        (savedMsg) =>
+          savedMsg.role === localMsg.role &&
+          savedMsg.content === localMsg.content
+      )
+  );
+
+  return [...loadedMessages, ...newMessages];
+});
 }
   };
 
