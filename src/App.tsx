@@ -1,3 +1,4 @@
+import ImageStudio from './features/image-studio/ImageStudio';
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -717,7 +718,7 @@ const extractFileText = async (file: File): Promise<string> => {
 };
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'signin' | 'chat'>('landing');
+  const [view, setView] = useState<'landing' | 'signin' | 'chat' | 'image-studio'>('landing');
   const [email, setEmail] = useState('');
   const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const displayName =
@@ -737,6 +738,15 @@ const userInitials = displayName
   .join('')
   .slice(0, 2)
   .toUpperCase();
+  useEffect(() => {
+  const handleBack = () => setView('chat');
+
+  window.addEventListener('prism-back-to-chat', handleBack);
+
+  return () => {
+    window.removeEventListener('prism-back-to-chat', handleBack);
+  };
+}, []);
   useEffect(() => {
   let isMounted = true;
 const loadPremiumStatus = async (userId: string) => {
@@ -3069,6 +3079,13 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
               >
                 <MessageSquare className="w-4 h-4" /> New chat
               </button>
+              <button
+  onClick={() => setView('image-studio')}
+  className={`w-full flex items-center gap-2 text-sm font-medium ${theme.textMuted} hover:${theme.text} ${theme.hoverBg} px-3 py-2 rounded-lg transition-colors mt-2`}
+>
+  <ImageIcon className="w-4 h-4 text-purple-400" />
+  Image Studio
+</button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 space-y-6">
@@ -3349,6 +3366,12 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 relative scroll-smooth"
         >
+          {view === 'image-studio' ? (
+  <div className="flex-1 overflow-y-auto">
+    <ImageStudio Logo={PrismLogo} />
+  </div>
+) : (
+  <>
           <div
             className={`absolute inset-0 bg-[linear-gradient(to_right,${
               isDark ? '#80808012' : '#00000008'
@@ -3738,6 +3761,8 @@ const handleSubscribe = async (planType: "monthly" | "yearly") => {
               )}
             </div>
           )}
+          </>
+        )}
         </main>
 
         {messages.length > 0 && (

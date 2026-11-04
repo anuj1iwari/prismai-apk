@@ -1,0 +1,265 @@
+.image-studio {
+  min-height: 100vh;
+  padding: 32px;
+  background: #08090d;
+  color: #f8fafc;
+  overflow-y: auto;
+}
+
+.studio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 35px;
+}
+
+.studio-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #a78bfa;
+}
+
+.studio-title h1 {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.studio-header p {
+  color: #9295a3;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.studio-pro-badge {
+  padding: 10px 17px;
+  border: 1px solid #8b5cf6;
+  border-radius: 30px;
+  color: #c4b5fd;
+  font-size: 13px;
+}
+
+.studio-content {
+  max-width: 1100px;
+  margin: auto;
+}
+
+.generation-panel {
+  background: #11131b;
+  border: 1px solid #252735;
+  border-radius: 18px;
+  padding: 25px;
+}
+
+.generation-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.generation-heading h2,
+.gallery-heading h2 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.generation-heading span {
+  font-size: 12px;
+  color: #a78bfa;
+}
+
+.prompt-container {
+  background: #090a10;
+  border: 1px solid #303344;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.prompt-container textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: vertical;
+  color: white;
+  font-size: 15px;
+  min-height: 110px;
+}
+
+.prompt-container textarea::placeholder {
+  color: #777b8c;
+}
+
+.prompt-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #252735;
+  padding-top: 12px;
+  color: #777b8c;
+  font-size: 12px;
+}
+
+.upload-button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  cursor: pointer;
+  color: #c4b5fd;
+}
+
+.selected-file {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  margin-top: 10px;
+  background: #1c1b2b;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.selected-file button {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+.studio-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-top: 22px;
+}
+
+.option-group label {
+  display: block;
+  font-size: 12px;
+  color: #9295a3;
+  margin-bottom: 9px;
+}
+
+.option-group select {
+  width: 100%;
+  padding: 12px;
+  background: #1a1c27;
+  color: white;
+  border: 1px solid #303344;
+  border-radius: 9px;
+  outline: none;
+}
+
+.generate-button {
+  width: 100%;
+  margin-top: 25px;
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #7c3aed, #6366f1);
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.generate-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.generate-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gallery-section {
+  margin-top: 40px;
+}
+
+.gallery-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gallery-heading p {
+  color: #9295a3;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.gallery-count {
+  font-size: 12px;
+  color: #a78bfa;
+}
+
+.gallery-empty {
+  margin-top: 20px;
+  padding: 65px 20px;
+  text-align: center;
+  background: #11131b;
+  border: 1px dashed #35374a;
+  border-radius: 16px;
+}
+
+.empty-icon {
+  width: 75px;
+  height: 75px;
+  display: grid;
+  place-items: center;
+  margin: auto auto 20px;
+  border-radius: 20px;
+  background: #211b38;
+  color: #a78bfa;
+}
+
+.gallery-empty h3 {
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.gallery-empty p {
+  color: #9295a3;
+  font-size: 13px;
+  max-width: 350px;
+  margin: auto;
+  line-height: 1.7;
+}
+
+.spin {
+  animation: studio-spin 1s linear infinite;
+}
+
+@keyframes studio-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .image-studio {
+    padding: 18px;
+  }
+
+  .studio-options {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .studio-pro-badge {
+    font-size: 11px;
+  }
+}
